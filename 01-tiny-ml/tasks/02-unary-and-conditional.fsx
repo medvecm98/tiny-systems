@@ -60,9 +60,6 @@ let rec evaluate (ctx:VariableContext) (e:Expression) =
         | 1 -> evaluate ctx e2
         | _ -> evaluate ctx e3
 
-  // TODO: Add the correct handling of 'If' here!
-
-
 
 // ----------------------------------------------------------------------------
 // Test cases
