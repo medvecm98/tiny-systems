@@ -20,9 +20,6 @@ type Command =
   | If of Expression * Command
   | Clear
   | Poke of Expression * Expression * Expression
-  // NOTE: Input("X") reads a number from console and assigns it to X;
-  // Stop terminates the program; I also modified Print to take a list of
-  // expressions instead of just one (which is what C64 supports too).
   | Print of Expression list
   | Input of string 
   | Stop
