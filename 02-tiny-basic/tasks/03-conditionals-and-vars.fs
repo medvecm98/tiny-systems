@@ -5,7 +5,6 @@ module TinyBASIC
 
 type Value =
   | StringValue of string
-  // NOTE: Added numerical and Boolean values
   | NumberValue of int
   | BoolValue of bool
 
@@ -27,8 +26,9 @@ type Command =
   | If of Expression * Command
 
 type State = 
-  { Program : list<int * Command> 
-    // TODO: Add variable context to the program state
+  { 
+    Program : list<int * Command>
+    Context : Map<string, Value>
   }
 
 // ----------------------------------------------------------------------------
@@ -36,17 +36,38 @@ type State =
 // ----------------------------------------------------------------------------
 
 let printValue value = 
-  // TODO: Add support for printing NumberValue and BoolValue
-  failwith "implemented in step 1"
+  match value with
+  | StringValue s ->
+    printfn "%s" s
+  | NumberValue i ->
+    printfn "%d" i
+  | BoolValue b ->
+    printfn "%b" b
 
-let getLine state line = failwith "implemented in step 1"
-let addLine state (line, cmd) = failwith "implemented in step 2"
+let rec getLineOfProgram(program: list<int * Command>, line: int) =
+  match program with
+    | (lineNumber, command)::tail ->
+      if lineNumber = line then
+        command
+      else
+        getLineOfProgram (tail, line)
+    | [] ->
+      failwith "No such line number found."
+
+let rec getLine state line =
+  (line, getLineOfProgram (state.Program, line))
+
+let addLine state (line, cmd) = 
+  {
+    Program = state.Program |> List.filter (fun (l, c) -> l <> line) |> List.append [(line, cmd)] |> List.sortBy (fun (l, c) -> l)
+    Context = state.Context
+  }
 
 // ----------------------------------------------------------------------------
 // Evaluator
 // ----------------------------------------------------------------------------
 
-let rec evalExpression expr = 
+let rec evalExpression state expr = 
   // TODO: Add support for 'Function' and 'Variable'. For now, handle just the two
   // functions we need, i.e. "-" (takes two numbers & returns a number) and "="
   // (takes two values and returns Boolean). Note that you can test if two
@@ -54,7 +75,34 @@ let rec evalExpression expr =
   //
   // HINT: You will need to pass the program state to 'evalExpression' 
   // in order to be able to handle variables!
-  failwith "implemented in step 1"
+  match expr with
+  | Const c ->
+    c
+  | Function (_, _::[]) | Function (_, []) ->
+      failwith "Not enough arguments in funtion call"
+  | Function (name, larg::rarg::_) ->
+    let lval = evalExpression state larg
+    let rval = evalExpression state rarg
+    match name with
+    | "-" ->
+      match lval, rval with
+      | NumberValue ln, NumberValue rn ->
+        NumberValue(ln - rn)
+      | _ ->
+        failwith "Can't use strings or bools in subtraction."
+    | "=" ->
+      BoolValue(lval = rval)
+    | _ ->
+      failwith "Invalid function or binary operator."
+  | Variable var ->
+    let tryFind = Map.tryFind var state.Context
+    match tryFind with
+    | Some v ->
+      v
+    | None ->
+      failwith "Invalid variable name"
+
+    
 
 let rec runCommand state (line, cmd) =
   match cmd with 
@@ -62,33 +110,71 @@ let rec runCommand state (line, cmd) =
       let first = List.head state.Program    
       runCommand state first
 
-  | Print(expr) -> failwith "implemented in step 1"
-  | Goto(line) -> failwith "implemented in step 1"
+  | Print(expr) ->
+      (state, expr) ||> evalExpression |> printValue
+      runNextLine state line
+  | Goto(ln) ->
+      getLine state ln |> runCommand state
   
-  // TODO: Implement assignment and conditional. Assignment should run the
-  // next line after setting the variable value. 'If' is a bit trickier:
-  // * 'L1: IF TRUE THEN GOTO <L2>' will continue evaluating on line 'L2'
-  // * 'L1: IF FALSE THEN GOTO <L2>' will continue on line after 'L1'
-  // * 'L1: IF TRUE THEN PRINT "HI"' will print HI and continue on line after 'L1'
-  //
-  // HINT: If <e> evaluates to TRUE, you can call 'runCommand' recursively with
-  // the command in the 'THEN' branch and the current line as the line number.
-  | Assign _ | If _ -> failwith "not implemented"
+  | Assign (name, expr) ->
+    let value = evalExpression state expr
+    let nctx = state.Context |> Map.add name value
+    let nstate = {
+      Program = state.Program
+      Context = nctx
+    }
+    runNextLine nstate line
+  | If (expr, subCmd) ->
+    match evalExpression state expr with
+    | BoolValue false ->
+      runNextLine state line
+    | BoolValue true ->
+      runCommand state (line, subCmd)
+    | _ ->
+      failwith "Invalid type in IF condition."
 
-and runNextLine state line = failwith "implemented in step 1"
+and runNextLine state line = 
+  match getLineOfProgramGreater(state.Program, line) with
+    | None ->
+      state
+    | Some (-1, _) ->
+      state
+    | Some (l, c) ->
+      runCommand state (l, c)
+
+and getLineOfProgramGreater(program: list<int * Command>, line: int) =
+  match program with
+    | (lineNumber, command)::tail ->
+      if lineNumber > line then
+        Some (lineNumber, command)
+      else
+        getLineOfProgramGreater (tail, line)
+    | [] ->
+      None
 
 // ----------------------------------------------------------------------------
 // Interactive program editing
 // ----------------------------------------------------------------------------
 
-let runInput state (line, cmd) = failwith "implemented in step 2"
-let runInputs state cmds = failwith "implemented in step 2"
+let runInput state (line, cmd) =
+  match line with
+  | Some ln ->
+    addLine state (ln, cmd)
+  | None ->
+    runCommand state (-1, cmd)
+      
+
+let runInputs state cmds =
+  (state, cmds) ||> List.fold (fun s c -> runInput s c)
 
 // ----------------------------------------------------------------------------
 // Test cases
 // ----------------------------------------------------------------------------
 
-let empty = { Program = [] } // TODO: Add empty variables to the initial state!
+let empty = { 
+  Program = []
+  Context = Map.empty
+} // TODO: Add empty variables to the initial state!
 
 let helloOnce = 
   [ Some 10, Print (Const (StringValue "HELLO WORLD\n")) 
@@ -99,6 +185,14 @@ let helloInf =
   [ Some 20, Goto 10
     Some 10, Print (Const (StringValue "HELLO WORLD\n")) 
     Some 10, Print (Const (StringValue "HELLO NPRG077\n")) 
+    None, Run ]
+
+let helloNew = 
+  [ Some 10, Print (Const (StringValue "HELLO WORLD 10\n")) 
+    Some 20, Print (Const (StringValue "HELLO NPRG077 20\n")) 
+    Some 30, Print (Const (StringValue "HELLO NPRG077 30\n")) 
+    Some 40, Print (Const (StringValue "HELLO NPRG077 40\n")) 
+    Some 50, Print (Const (StringValue "HELLO NPRG077 50\n")) 
     None, Run ]
 
 let testVariables = 
