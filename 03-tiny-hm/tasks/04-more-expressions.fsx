@@ -71,6 +71,7 @@ let rec solve cs =
     let ty = substType (Map.ofList subst) ty
     (var, ty)::subst
   | (TyFunction(tyF11, tyF12), TyFunction(tyF21, tyF22))::cs ->
+    
     solve ((tyF11, tyF21)::(tyF12, tyF22)::cs)
 
 
@@ -135,7 +136,7 @@ let rec generate (ctx:TypingContext) e =
       let t1, s1 = generate ctx e1
       let t2, s2 = generate (Map.add v t1 ctx) e2
       t2, s1 @ s2
-  
+
   | Lambda(v, e) ->
       let targ = newTyVariable()
       // TODO: We do not know what the type of the variable 'v' is, so we 
@@ -149,11 +150,11 @@ let rec generate (ctx:TypingContext) e =
       // to see what the argument/return type of the function is. Instead,
       // we have to generate a new type variable and add a constraint.
       let t2, s2 = generate ctx e2
-      let targ = newTyVariable()
+      let trv = newTyVariable()
       match e1 with
-      | Variable a ->
-        let t1, s1 = generate (Map.add a t2 ctx) e1
-        t1, s1 @ s2
+      | Variable _ ->
+        let t1, s1 = generate ctx e1
+        trv, s1 @ s2 @ [t1, TyFunction(t2, trv)]
       | _ -> failwith "a"
   
 
@@ -168,43 +169,31 @@ let infer e =
   let typ = substType (Map.ofList subst) typ
   typ
 
-
-// NOTE: Using the above, you will end up with ugly random type variable
-// names like '_a4' etc. You can improve this by collecting all the type
-// variable names that appear in a type and substituting them with a 
-// list of nice names. Useful bit of code to generate the substitution is:
-//
-//   Map.ofList [ for i, n in Seq.indexed ["_a4"; "_a5"] -> 
-//     n, string('a' + char i) ]
-//
-// You would still need to write code to collect all type variables in a type.
-
-
-// // let x = 10 in x = 10
-// Let("x", Constant 10, Binary("=", Variable "x", Constant 10))
-// |> infer 
+// let x = 10 in x = 10
+Let("x", Constant 10, Binary("=", Variable "x", Constant 10))
+|> infer 
 
 // let f = fun x -> x*2 in (f 20) + (f 1)
-// Let("f",
-//   Lambda("x", Binary("*", Variable("x"), Constant(2))),
-//   Binary("+", 
-//     Application(Variable("f"), Constant(20)),
-//     Application(Variable("f"), Constant(1)) 
-//   ))
-// |> infer
+Let("f",
+  Lambda("x", Binary("*", Variable("x"), Constant(2))),
+  Binary("+", 
+    Application(Variable("f"), Constant(20)),
+    Application(Variable("f"), Constant(1)) 
+  ))
+|> infer
 
-// // fun x f -> f (f x)
-// Lambda("x", Lambda("f", 
-//   Application(Variable "f", Application(Variable "f", Variable "x"))))
-// |> infer
+// fun x f -> f (f x)
+Lambda("x", Lambda("f", 
+  Application(Variable "f", Application(Variable "f", Variable "x"))))
+|> infer
 
-// // fun f -> f f 
-// // This does not type check due to occurs check
-// Lambda("f", 
-//   Application(Variable "f", Variable "f"))
-// |> infer
+// fun f -> f f 
+// This does not type check due to occurs check
+Lambda("f", 
+  Application(Variable "f", Variable "f"))
+|> infer
 
-// fun f -> f 1 + f (2 = 3) 
+fun f -> f 1 + f (2 = 3) 
 // This does not type check because argument of 'f' cannot be both 'int' and 'bool'
 Lambda("f", 
   Binary("+",
