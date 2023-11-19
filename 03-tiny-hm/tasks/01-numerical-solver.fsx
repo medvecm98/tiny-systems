@@ -15,22 +15,36 @@ type Number =
 
 let rec occursCheck (v:string) (n:Number) = 
   // TODO: Check if variable 'v' appears anywhere inside 'n'
-  false
+  match n with
+  | Variable(v2) ->
+    if v = v2 then true else false
+  | Succ(s) ->
+    occursCheck v s
+  | _ ->
+    false
 
-let rec substite (v:string) (subst:Number) (n:Number) =
+
+let rec substitute (v:string) (subst:Number) (n:Number) =
   // TODO: Replace all occurrences of variable 'v' in the
   // number 'n' with the replacement number 'subst'
-  n
+  match n with
+  | Variable(v2) ->
+    if v = v2 then subst else n
+  | Succ(s) ->
+    Succ(substitute v subst s)
+  | _ ->
+    n
 
 let substituteConstraints (v:string) (subst:Number) (constraints:list<Number * Number>) = 
   // TODO: Substitute 'v' for 'subst' (use 'substitute') in 
   // all numbers in all the constraints in 'constraints'
-  constraints
+  constraints |> List.map ( fun (n1, n2) -> (substitute v subst n1, substitute v subst n2) )
+
 
 let substituteAll (subst:list<string * Number>) (n:Number) =
   // TODO: Perform all substitutions 
   // specified  in 'subst' on the number 'n'
-  n
+  (n, subst) ||> List.fold (fun n1 (v, n2) -> substitute v n2 n1)
 
 let rec solve constraints = 
   match constraints with 
@@ -50,6 +64,9 @@ let rec solve constraints =
 // Should work: x = Zero
 solve 
   [ Succ(Variable "x"), Succ(Zero) ]
+
+solve 
+  [ Succ(Zero), Succ(Variable "x") ]
 
 // Should faild: S(Z) <> Z
 solve 
