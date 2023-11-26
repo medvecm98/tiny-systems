@@ -155,7 +155,7 @@ let rec generate (ctx:TypingContext) e =
       | Variable _ ->
         let t1, s1 = generate ctx e1
         trv, s1 @ s2 @ [t1, TyFunction(t2, trv)]
-      | _ -> failwith "a"
+      | _ -> failwith "Application generation failed."
   
 
 // ----------------------------------------------------------------------------
