@@ -26,20 +26,33 @@ let rec substitute (subst:Map<string, Term>) term =
   // with the replacement specified by 'subst.[var]'.
   // You can assume the terms in 'subst' do not contain
   // any of the variables that we want to replace.
-  failwith "not implemented"
+  match term with
+  | Variable v ->
+    if Map.containsKey v subst then
+      subst.[v]
+    else
+      Variable v
+  | Predicate (p, term::terms) ->
+    Predicate(p, (substitute subst term)::(substituteTerms subst terms))
+  | t -> t
+and substituteTerms subst (terms:list<Term>) = 
+  // TODO: Apply substitution 'subst' to all the terms in 'terms'
+  match terms with
+  | term::terms ->
+    (substitute subst term)::(substituteTerms subst terms)
+  | [] ->
+    []
 
 
-let substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) = 
+let rec substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) = 
   // TODO: Apply the substitution 'newSubst' to all the terms 
   // in the existing substitiution 'subst'. (We represent one 
   // as a map and the other as a list of pairs, which is a bit 
   // inelegant, but it makes calling this function easier later.)
-  failwith "not implemented"
+  match subst with
+  | l::ls ->
+    
 
-
-let substituteTerms subst (terms:list<Term>) = 
-  // TODO: Apply substitution 'subst' to all the terms in 'terms'
-  failwith "not implemented"
 
 
 let rec unifyLists l1 l2 = 
@@ -53,10 +66,31 @@ let rec unifyLists l1 l2 =
   // (2) The substitution 's2' is applied to all terms in substitution 's1' before returning
   //
   // You can look at your ML type inference code. The structure is very similar! 
-  failwith "implemented in step 1"
+  match l1, l2 with 
+  | [], [] -> 
+      Some []
+  | h1::t1, h2::t2 -> 
+      let simpleUni = unify h1 h2
+      let listUni = unifyLists t1 t2
+      match simpleUni, listUni with
+      | Some su, Some lu -> Some(su @ lu)
+      | _, _ -> None
+  | _ -> 
+    None
 
 and unify t1 t2 = 
-  failwith "implemented in step 1"
+  match t1, t2 with 
+  | Atom s1 , Atom s2 ->
+    if s1 = s2 then Some [] else None
+  | t, Variable v | Variable v, t ->
+    Some [(v, t)]
+  | Predicate (p1, terms1), Predicate (p2, terms2) ->
+    if p1 = p2 then
+      unifyLists terms1 terms2
+    else
+      None
+  | _ ->
+      None
 
 // ----------------------------------------------------------------------------
 // Advanced unification tests requiring correct substitution

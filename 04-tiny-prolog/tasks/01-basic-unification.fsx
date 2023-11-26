@@ -34,25 +34,38 @@ let rec unifyLists l1 l2 : option<list<string * Term>> =
   match l1, l2 with 
   | [], [] -> 
       // TODO: Succeeds, but returns an empty substitution
-      failwith "not implemented"
+      Some([])
   | h1::t1, h2::t2 -> 
       // TODO: Unify 'h1' with 'h2' using 'unify' and
       // 't1' with 't2' using 'unifyLists'. If both 
       // succeed, return the generated joint substitution!
-      failwith "not implemented"
+      let simpleUni = unify h1 h2
+      let listUni = unifyLists t1 t2
+      match simpleUni, listUni with
+      | Some(su), Some(lu) -> Some(su @ lu)
+      | _, _ -> None
   | _ -> 
     // TODO: Lists cannot be unified 
-    failwith "not implemented"
+    None
 
 and unify t1 t2 = 
   match t1, t2 with 
+  | Atom(s1), Atom(s2) ->
+    if s1 = s2 then Some([]) else None
+  | t, Variable(v) | Variable(v), t ->
+    Some([(v, t)])
+  | Predicate(p1, terms1), Predicate(p2, terms2) ->
+    if p1 = p2 then
+      unifyLists terms1 terms2
+    else
+      None
   | _ ->
       // TODO: Add all the necessary cases here!
       // * For matching atoms, return empty substitution
       // * For matching predicates, return the result of 'unifyLists'
       // * For variable and any term, return a new substitution
       // * For anything else, return None (failed to unify)
-      failwith "not implemented"
+      None
 
 // ----------------------------------------------------------------------------
 // Basic unification tests 
