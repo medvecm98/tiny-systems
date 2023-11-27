@@ -77,33 +77,32 @@ unify
   (Predicate("human", [Atom("socrates")]))
   (Predicate("human", [Variable("X")]))
 
-// Example: human(socrates) ~ mortal(X) 
-// Returns: None (fail)
-unify
-  (Predicate("human", [Atom("socrates")]))
-  (Predicate("mortal", [Variable("X")]))
+// // Example: human(socrates) ~ mortal(X) 
+// // Returns: None (fail)
+// unify
+//   (Predicate("human", [Atom("socrates")]))
+//   (Predicate("mortal", [Variable("X")]))
 
-// Example: parent(charles, harry) ~ parent(charles, X)
-// Returns: [X -> harry]
-unify
-  (Predicate("parent", [Atom("charles"); Atom("harry")]))
-  (Predicate("parent", [Atom("charles"); Variable("X")]))
+// // Example: parent(charles, harry) ~ parent(charles, X)
+// // Returns: [X -> harry]
+// unify
+//   (Predicate("parent", [Atom("charles"); Atom("harry")]))
+//   (Predicate("parent", [Atom("charles"); Variable("X")]))
 
-// Example: parent(X, harry) ~ parent(charles, Y)
-// Returns: [X -> charles; Y -> harry]
-unify
-  (Predicate("parent", [Variable("X"); Atom("harry")]))
-  (Predicate("parent", [Atom("charles"); Variable("Y")]))
+// // Example: parent(X, harry) ~ parent(charles, Y)
+// // Returns: [X -> charles; Y -> harry]
+// unify
+//   (Predicate("parent", [Variable("X"); Atom("harry")]))
+//   (Predicate("parent", [Atom("charles"); Variable("Y")]))
 
-// Example: succ(succ(succ(zero))) ~ succ(X)
-// Returns: [X -> succ(succ(zero))]
-unify
-  (Predicate("succ", [Predicate("succ", [Predicate("succ", [Atom("zero")])])]))
-  (Predicate("succ", [Variable("X")]))
+// // Example: succ(succ(succ(zero))) ~ succ(X)
+// // Returns: [X -> succ(succ(zero))]
+// unify
+//   (Predicate("succ", [Predicate("succ", [Predicate("succ", [Atom("zero")])])]))
+//   (Predicate("succ", [Variable("X")]))
 
-// Example: succ(succ(zero)) ~ succ(zero)
-// Returns: None (fail)
-unify
-  (Predicate("succ", [Predicate("succ", [Atom("zero")])]))
-  (Predicate("succ", [Atom("zero")]))
-
+// // Example: succ(succ(zero)) ~ succ(zero)
+// // Returns: None (fail)
+// unify
+//   (Predicate("succ", [Predicate("succ", [Atom("zero")])]))
+//   (Predicate("succ", [Atom("zero")]))

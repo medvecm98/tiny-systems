@@ -22,7 +22,7 @@ let rule p b = { Head = p; Body = b }
 // ----------------------------------------------------------------------------
 
 let rec substitute (subst:Map<string, Term>) term = 
-  // TODO: Replace all variables that appear in 'subst'
+  // TODO: Replace all variables that appear in 'term'
   // with the replacement specified by 'subst.[var]'.
   // You can assume the terms in 'subst' do not contain
   // any of the variables that we want to replace.
@@ -33,7 +33,7 @@ let rec substitute (subst:Map<string, Term>) term =
     else
       Variable v
   | Predicate (p, term::terms) ->
-    Predicate(p, (substitute subst term)::(substituteTerms subst terms))
+    Predicate (p, (substitute subst term)::(substituteTerms subst terms))
   | t -> t
 and substituteTerms subst (terms:list<Term>) = 
   // TODO: Apply substitution 'subst' to all the terms in 'terms'
@@ -43,6 +43,8 @@ and substituteTerms subst (terms:list<Term>) =
   | [] ->
     []
 
+let append (m1:Map<_,_>) m2 =
+  m1 |> Seq.fold(fun st (KeyValue(k, v)) -> Map.add k v st) m2
 
 let rec substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) = 
   // TODO: Apply the substitution 'newSubst' to all the terms 
@@ -50,8 +52,9 @@ let rec substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>)
   // as a map and the other as a list of pairs, which is a bit 
   // inelegant, but it makes calling this function easier later.)
   match subst with
-  | l::ls ->
-    
+  | (var, term)::ls ->
+    (var, substitute newSubst term)::(substituteSubst newSubst ls)
+  | [] -> []
 
 
 
@@ -71,10 +74,15 @@ let rec unifyLists l1 l2 =
       Some []
   | h1::t1, h2::t2 -> 
       let simpleUni = unify h1 h2
-      let listUni = unifyLists t1 t2
-      match simpleUni, listUni with
-      | Some su, Some lu -> Some(su @ lu)
-      | _, _ -> None
+      match simpleUni with
+      | Some(simpleUni) ->
+        let t1Subst = substituteTerms (Map.ofList simpleUni) t1
+        let t2Subst = substituteTerms (Map.ofList simpleUni) t2
+        let listUni = unifyLists t1Subst t2Subst
+        match listUni with 
+        | Some(lu) -> Some(lu @ (substituteSubst (Map.ofList lu) simpleUni))
+        | _ -> None
+      | _ -> None
   | _ -> 
     None
 
@@ -96,33 +104,33 @@ and unify t1 t2 =
 // Advanced unification tests requiring correct substitution
 // ----------------------------------------------------------------------------
 
-// Rquires (1)
-// Example: loves(narcissus, narcissus) ~ loves(X, X)
-// Returns: [ X -> narcissus ]
-unify
-  (Predicate("loves", [Atom("narcissus"); Atom("narcissus")]))
-  (Predicate("loves", [Variable("X"); Variable("X")]))
+// // Rquires (1)
+// // Example: loves(narcissus, narcissus) ~ loves(X, X)
+// // Returns: [ X -> narcissus ]
+// unify
+//   (Predicate("loves", [Atom("narcissus"); Atom("narcissus")]))
+//   (Predicate("loves", [Variable("X"); Variable("X")]))
 
-// Requires (1)
-// Example: loves(odysseus, penelope) ~ loves(X, X)
-// Returns: None (cannot unify)
-unify
-  (Predicate("loves", [Atom("odysseus"); Atom("penelope")]))
-  (Predicate("loves", [Variable("X"); Variable("X")]))
+// // Requires (1)
+// // Example: loves(odysseus, penelope) ~ loves(X, X)
+// // Returns: None (cannot unify)
+// unify
+//   (Predicate("loves", [Atom("odysseus"); Atom("penelope")]))
+//   (Predicate("loves", [Variable("X"); Variable("X")]))
 
-// Requires (1)
-// Example: add(zero, succ(zero)) ~ add(Y, succ(Y))
-// Returns: [ Y -> zero ]
-unify
-  (Predicate("add", [Atom("zero"); Predicate("succ", [Atom("zero")])]))
-  (Predicate("add", [Variable("Y"); Predicate("succ", [Variable("Y")])]))
+// // Requires (1)
+// // Example: add(zero, succ(zero)) ~ add(Y, succ(Y))
+// // Returns: [ Y -> zero ]
+// unify
+//   (Predicate("add", [Atom("zero"); Predicate("succ", [Atom("zero")])]))
+//   (Predicate("add", [Variable("Y"); Predicate("succ", [Variable("Y")])]))
 
-// Requires (2)
-// Example: loves(X, narcissus) ~ loves(Y, X)
-// Returns: [ X -> narcissus; Y -> narcissus ]
-unify
-  (Predicate("loves", [Variable("X"); Atom("narcissus")]))
-  (Predicate("loves", [Variable("Y"); Variable("X")]))
+// // Requires (2)
+// // Example: loves(X, narcissus) ~ loves(Y, X)
+// // Returns: [ X -> narcissus; Y -> narcissus ]
+// unify
+//   (Predicate("loves", [Variable("X"); Atom("narcissus")]))
+//   (Predicate("loves", [Variable("Y"); Variable("X")]))
 
 // Requires (2)
 // Example: add(succ(X), X) ~ add(Y, succ(Z))
@@ -134,4 +142,3 @@ unify
   (Predicate("add", 
       [ Variable("Y"); 
         Predicate("succ", [Variable("Z")]) ]))
-

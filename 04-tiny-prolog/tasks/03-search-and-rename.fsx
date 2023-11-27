@@ -22,19 +22,62 @@ let rule p b = { Head = p; Body = b }
 // ----------------------------------------------------------------------------
 
 let rec substitute (subst:Map<string, Term>) term = 
-  failwith "implemented in step 2"
+  match term with
+  | Variable v ->
+    if Map.containsKey v subst then
+      subst.[v]
+    else
+      Variable v
+  | Predicate (p, term::terms) ->
+    Predicate (p, (substitute subst term)::(substituteTerms subst terms))
+  | t -> t
+and substituteTerms subst (terms:list<Term>) = 
+  match terms with
+  | term::terms ->
+    (substitute subst term)::(substituteTerms subst terms)
+  | [] ->
+    []
 
-let substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) = 
-  failwith "implemented in step 2"
+let append (m1:Map<_,_>) m2 =
+  m1 |> Seq.fold(fun st (KeyValue(k, v)) -> Map.add k v st) m2
 
-let substituteTerms subst (terms:list<Term>) = 
-  failwith "implemented in step 2"
+let rec substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>) = 
+  match subst with
+  | (var, term)::ls ->
+    (var, substitute newSubst term)::(substituteSubst newSubst ls)
+  | [] -> []
 
 let rec unifyLists l1 l2 = 
-  failwith "implemented in steps 1 and 2"
+  match l1, l2 with 
+  | [], [] -> 
+      Some []
+  | h1::t1, h2::t2 -> 
+      let simpleUni = unify h1 h2
+      match simpleUni with
+      | Some(simpleUni) ->
+        let t1Subst = substituteTerms (Map.ofList simpleUni) t1
+        let t2Subst = substituteTerms (Map.ofList simpleUni) t2
+        let listUni = unifyLists t1Subst t2Subst
+        match listUni with 
+        | Some(lu) -> Some(lu @ (substituteSubst (Map.ofList lu) simpleUni))
+        | _ -> None
+      | _ -> None
+  | _ -> 
+    None
 
 and unify t1 t2 = 
-  failwith "implemented in step 1"
+  match t1, t2 with 
+  | Atom s1 , Atom s2 ->
+    if s1 = s2 then Some [] else None
+  | t, Variable v | Variable v, t ->
+    Some [(v, t)]
+  | Predicate (p1, terms1), Predicate (p2, terms2) ->
+    if p1 = p2 then
+      unifyLists terms1 terms2
+    else
+      None
+  | _ ->
+      None
 
 // ----------------------------------------------------------------------------
 // Searching the program (database) and variable renaming
@@ -48,10 +91,13 @@ let rec freeVariables term =
   // TODO: Return a list of all variables that appear in 'term'
   // (this may contain duplicates, we will eliminate them below)
   // HINT: Use List.collect: ('a -> list<'b>) -> list<'a> -> list<'b>
-  failwith "not implemented"
+  match term with
+  | Variable v -> [v]
+  | Predicate(_, terms) ->
+    terms |> List.collect freeVariables
+  | _ -> []
 
-
-let withFreshVariables (clause:Clause) : Clause =
+let rec withFreshVariables (clause:Clause) : Clause =
   // TODO: Get a list of distinct variables in the clause (using 
   // 'freeVariables' and 'List.distinct'), generate a substitution 
   // that append a number 'n' obtained by 'nextNumber()' to the end
@@ -63,7 +109,22 @@ let withFreshVariables (clause:Clause) : Clause =
   //
   // This may not be correct if the user-provided names of variables
   // had numbers in them in a certain format, but that's OK for now! 
-  failwith "not implemented"
+  let number = (nextNumber ()).ToString()
+  let a = clause.Head |> freeVariables |> List.distinct |> List.collect (fun x -> [(x, Variable ([x; number] |> String.concat ""))])
+  let b = clause.Body |> List.collect freeVariables |> List.distinct |> List.collect (fun x -> [(x, Variable ([x; number] |> String.concat ""))])
+  let c = substitute (Map.ofList a) clause.Head
+  let d = substituteTerms (Map.ofList b) clause.Body
+
+  { 
+    Head = c
+    Body = d 
+  }
+
+
+let collectSubstitutions clause query =
+  match (unify clause.Head query) with
+  | Some(subst) -> [clause, subst]
+  | None -> []
 
 
 let query (program:list<Clause>) (query:Term) 
@@ -78,7 +139,9 @@ let query (program:list<Clause>) (query:Term)
   // clause and a substitution (list<string * Term>). Calling 'unify'
   // gives you 'option<list<string * Term>>', so you need to pattern match
   // on this and if it is 'Some(subst)' return 'Some(clause, subst)'.
-  failwith "not implemented"
+
+  let renamedProgram = program |> List.collect (fun x -> [x |> withFreshVariables])
+  renamedProgram |> List.collect (fun x -> collectSubstitutions x query)
 
 
 // ----------------------------------------------------------------------------
@@ -107,11 +170,11 @@ let family = [
   ]
 ]
 
-// Query: male(X)
-// Match #1: male(William)
-// Match #2: male(Charles)
-// Match #3: male(George)
-query family (Predicate("male", [Variable("X")]))
+// // Query: male(X)
+// // Match #1: male(William)
+// // Match #2: male(Charles)
+// // Match #3: male(George)
+// query family (Predicate("male", [Variable("X")]))
 
 // Query: father(X, William)
 // Match #1: father(X, Y) :- parent(X, Y), male(X)
