@@ -160,12 +160,13 @@ let rec solve program subst goals =
         let newGoals = List.concat [goals; clause.Body]
         let substNewGoals = substituteTerms (Map.ofList newSubst) newGoals
         let newNewSubst = substituteSubst (Map.ofList newSubst) subst
-        solve program newNewSubst substNewGoals
+        let substAppend = List.concat [newSubst; newNewSubst]
+        solve program substAppend substNewGoals
 
   | [] -> 
     // TODO: We solved all goals, which means 'subst' is a possible solution!
     // Print 'subst' (either using printfn "%A" or in some nicer way).
-    printfn "AAAAAAAAA: %A" subst
+    printfn "Goals: %A" subst
 
 // ----------------------------------------------------------------------------
 // Querying the British royal family 
@@ -186,11 +187,11 @@ let family = [
   ]
 ]
 
-// Query: father(X, William)
-// Result #1: [ X -> Charles, ... ]
-solve family [] [ Predicate("father", [Variable("X"); Atom("William")]) ]
+// // Query: father(X, William)
+// // Result #1: [ X -> Charles, ... ]
+// solve family [] [ Predicate("father", [Variable("X"); Atom("William")]) ]
 
-// // Query: father(X, Y)
-// // Result #1: [ X -> Charles, Y -> William, ... ]
-// // Result #2: [ X -> George, Y -> William, ... ]
-// solve family [] [ Predicate("father", [Variable("X"); Variable("Y")]) ]
+// Query: father(X, Y)
+// Result #1: [ X -> Charles, Y -> William, ... ]
+// Result #2: [ X -> George, Y -> William, ... ]
+solve family [] [ Predicate("father", [Variable("X"); Variable("Y")]) ]
