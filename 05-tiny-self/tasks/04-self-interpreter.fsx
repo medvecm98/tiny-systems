@@ -36,16 +36,25 @@ let makeNativeMethod f =
   makeObject [] (makeSpecialObject [] (Native(f)))
 
 // NOTE: Implemented in step #2
-let addSlot n contents obj = failwith "Implemented in step 2"
-let addParentSlot n contents obj = failwith "Implemented in step 2"
-let cloneObject obj = failwith "Implemented in step 2"
+let addSlot (n:string) (contents:Objekt) (obj:Objekt) : unit = 
+  obj.Slots <- ([obj.Slots; [{Name = n; Contents = contents; IsParent = false}]] |> List.concat)
+
+let addParentSlot (n:string) (contents:Objekt) (obj:Objekt) : unit = 
+  obj.Slots <- ([obj.Slots; [{Name = n; Contents = contents; IsParent = true}]] |> List.concat)
+
+let cloneObject (obj:Objekt) : Objekt = 
+  {Slots = obj.Slots; Code = obj.Code; Special = obj.Special}
 
 // ----------------------------------------------------------------------------
 // Lookup and message sending
 // ----------------------------------------------------------------------------
 
-let rec lookup msg obj : list<Objekt * Slot> = failwith "implemented in step 3"
-and parentLookup msg obj : list<Objekt * Slot> = failwith "implemented in step 2"
+let rec lookup msg obj : list<Objekt * Slot> = 
+  match obj.Slots |> List.tryFind (fun s -> s.Name = msg) with
+  | Some(slot) ->
+    [obj, slot]
+  | None ->
+    obj.Slots |> List.collect (fun s -> lookup msg s.Contents)
 
 // TODO: If 'slotValue' has some non-native 'Code', we want to evaluate it.
 // But it will be easier to add this later, so copy code from step 3 and then
@@ -56,10 +65,31 @@ and parentLookup msg obj : list<Objekt * Slot> = failwith "implemented in step 2
 // case of native code) as the argument, so create data object with 'activation' 
 // slot and pass the as argument when calling 'eval'.
 // (to call 'send', you will need to use 'let rec .. and ..' here)
-let eval (slotValue:Objekt) (args:Objekt) (instance:Objekt) =
-  failwith "to be modified"
-let send (msg:string) (args:Objekt) (instance:Objekt) : Objekt =
-  failwith "implemented in step 3"
+let rec eval (slotValue:Objekt) (args:Objekt) (instance:Objekt) =
+  match slotValue.Code with
+  | None -> slotValue
+  | Some(code) ->
+    match code.Special with
+    | None ->
+      let dataObj = makeDataObject [makeSlot "activation" ]
+      send "eval" dataObj code
+    | Some(specUnion) -> 
+      match specUnion with
+      | String(s) -> failwith "special object non-native"
+      | Native(func) ->
+        let cloned = cloneObject(slotValue)
+        addParentSlot "self*" instance cloned
+        addParentSlot "args*" args cloned
+        func(cloned)
+
+and send (msg:string) (args:Objekt) (instance:Objekt) : Objekt =
+  let slots = lookup msg instance
+  if List.length slots <> 1 then
+    failwith (sprintf "More than one receiver %s" msg)
+  else
+    match slots.[0] with
+    | _, slot -> 
+      eval slot.Contents args instance
 
 // ----------------------------------------------------------------------------
 // Helpers for testing & object construction
@@ -77,20 +107,56 @@ let getStringValue o =
   | _ -> failwith "not a string value"
 
 // NOTE: Implemented in step #2
-let empty = failwith "implemented in step 2"
-let printCode = failwith<Objekt> "implemented in step 2"
-let stringPrototype = failwith<Objekt> "implemented in step 2"
-let makeString s = failwith "implemented in step 2"
+let empty : Objekt = {Slots = []; Code = None; Special = None}
+
+let printCode = makeNativeMethod (fun arcd ->
+  let spec = send "value" empty arcd
+  match spec.Special with
+  | Some(String(s)) ->
+    printfn "%s" s
+  | _ -> failwith "what"
+  empty
+)
+let stringPrototype = makeDataObject [
+  makeSlot "print" printCode  
+]
+let makeString s = 
+  makeDataObject [ 
+    makeSlot "value" (makeSpecialObject [] (String s)) 
+    makeParentSlot "parent*" stringPrototype
+  ]
 
 // ----------------------------------------------------------------------------
 // Cloning and assignments
 // ----------------------------------------------------------------------------
 
-let cloneMethod = failwith<Objekt> "implemented in step 3"
-let clonablePrototype = failwith<Objekt> "implemented in step 3"
+let cloneMethod = makeNativeMethod (fun arcd -> 
+    let lookups = lookup "self*" arcd
+    if List.length lookups = 1 then
+      match lookups.[0] with
+      | self, slot ->
+        cloneObject slot.Contents
+    else
+      failwith "makeNativeMethod lookup fail"
+  )
 
-let assignmentMethod n = failwith "implemented in step 3"
-let makeAssignmentSlot n = failwith "implemented in step 3"
+let clonablePrototype = 
+  {Slots = [{Name = "clone"; Contents = cloneMethod; IsParent = false}]; Code = None; Special = None}
+
+let assignmentMethod n = makeNativeMethod (fun arcd -> 
+    let nLookup = lookup n arcd
+    let newLookup = lookup "new" arcd
+    match nLookup.[0] with
+    | obj1, slot1 ->
+      match newLookup.[0] with
+      | obj2, slot2 ->
+        obj1.Slots <- (obj1.Slots |> List.map (fun s -> if s.Name = n then {Name = n; Contents = slot2.Contents; IsParent = slot2.IsParent} else s))
+        obj1
+  )
+
+// Creates an assignment slot for a slot named 'n'
+let makeAssignmentSlot n = 
+  { Name = n + ":"; Contents = assignmentMethod n; IsParent = false }
 
 // ----------------------------------------------------------------------------
 // TinySelf code representation & interpreter
@@ -114,7 +180,12 @@ let makeAssignmentSlot n = failwith "implemented in step 3"
 // which is the activation record for the 'eval' call. But this in turn 
 // contains activation record 'activation' which is the activation record
 // for the message send that our interpreter is handling!
-let exprSelf = failwith<Objekt> "not implemented"
+let exprSelf = makeDataObject [
+  makeSlot "eval" (makeNativeMethod (fun arcd ->
+    let obj = lookupSlotValue "activation" arcd
+    lookupSlotValue "self*" obj
+  ))
+] 
   
 // DEMO: 'string' expression stores the string value in a slot 'str'. When 
 // evaluated, it fetches 'str' (slot value) from the activation record.
