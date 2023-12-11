@@ -57,7 +57,6 @@ let rec substituteSubst (newSubst:Map<string, Term>) (subst:list<string * Term>)
   | [] -> []
 
 
-
 let rec unifyLists l1 l2 = 
   // TODO: Modify the implementation to use 'substituteTerms' and 'substituteSubst'.
   //
